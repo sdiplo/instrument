@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Index</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            text-align: center;
+        }
+        a {
+            display: inline-block;
+            margin: 10px 0;
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            text-align: center;
+        }
+        a:hover {
+            background-color: #45a049;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            cursor: pointer;
+        }
+        th, td {
+            font-size: 14px;
+        }
+        img {
+            width: 100%;
+            height: auto;
+            cursor: pointer;
+        }
+        .filter-input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 5px;
+        }
+        @media (max-width: 768px) {
+            th, td {
+                display: block;
+                width: 100%;
+                box-sizing: border-box;
+                text-align: right;
+            }
+            th::before, td::before {
+                content: attr(data-label);
+                float: left;
+                font-weight: bold;
+            }
+            tr {
+                display: block;
+                margin-bottom: 10px;
+            }
+            tr:nth-child(even) {
+                background-color: #f2f2f2;
+            }
+        }
+    </style>
+    <script>
+        function sortTable(columnIndex) {
+            const table = document.getElementById("instrumentsTable");
+            const rows = Array.from(table.rows).slice(2); // пропускаем заголовок и строку фильтра
+            const isAscending = table.rows[0].cells[columnIndex].classList.toggle("ascending");
+
+            rows.sort((row1, row2) => {
+                const cell1 = row1.cells[columnIndex].innerText;
+                const cell2 = row2.cells[columnIndex].innerText;
+
+                if (!isNaN(cell1) && !isNaN(cell2)) {
+                    return isAscending ? cell1 - cell2 : cell2 - cell1;
+                }
+                return isAscending ? cell1.localeCompare(cell2) : cell2.localeCompare(cell1);
+            });
+
+            rows.forEach(row => table.appendChild(row));
+        }
+
+        function filterTable() {
+            const table = document.getElementById("instrumentsTable");
+            const filters = Array.from(document.getElementsByClassName("filter-input"));
+            const rows = Array.from(table.rows).slice(2); // пропускаем заголовок и строку фильтра
+
+            rows.forEach(row => {
+                let showRow = true;
+                filters.forEach((filter, index) => {
+                    const cell = row.cells[index].innerText.toLowerCase();
+                    const filterValue = filter.value.toLowerCase();
+                    if (!cell.includes(filterValue)) {
+                        showRow = false;
+                    }
+                });
+                row.style.display = showRow ? "" : "none";
+            });
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        {% if not current_user.is_authenticated %}
+        <p>
+            <a href="{{ url_for('main.register') }}">Регистрация</a> |
+            <a href="{{ url_for('main.login') }}">Вход</a>
+        </p>
+        {% else %}
+        <p>
+            Привет, {{ current_user.username }}!
+            <a href="{{ url_for('main.logout') }}">Выход</a>
+        </p>
+        <h1>Список инструментов</h1>
+        <a href="{{ url_for('main.upload') }}">Добавить новый инструмент</a>
+        <table id="instrumentsTable">
+            <thead>
+                <tr>
+                    <th style="width: 5%;" onclick="sortTable(0)">ID</th>
+                    <th style="width: 15%;" onclick="sortTable(1)">Название</th>
+                    <th style="width: 35%;" onclick="sortTable(2)">Описание</th>
+                    <th style="width: 10%;" onclick="sortTable(3)">Место хранения</th>
+                    <th style="width: 35%;">Фото</th>
+                </tr>
+                <tr>
+                    <th><input type="text" class="filter-input" onkeyup="filterTable()" placeholder="Фильтр по ID"></th>
+                    <th><input type="text" class="filter-input" onkeyup="filterTable()" placeholder="Фильтр по названию"></th>
+                    <th><input type="text" class="filter-input" onkeyup="filterTable()" placeholder="Фильтр по описанию"></th>
+                    <th><input type="text" class="filter-input" onkeyup="filterTable()" placeholder="Фильтр по месту хранения"></th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for instrument in instruments %}
+                <tr>
+                    <td data-label="ID">{{ instrument.id }}</td>
+                    <td data-label="Название">{{ instrument.name }}</td>
+                    <td data-label="Описание">{{ instrument.description }}</td>
+                    <td data-label="Место хранения">{{ instrument.storage_location }}</td>
+                    <td data-label="Фото">
+                        {% if instrument.photo %}
+                        <a href="{{ url_for('main.edit', instrument_id=instrument.id) }}">
+                            <img src="data:image/jpeg;base64,{{ instrument.photo }}" alt="{{ instrument.name }}">
+                        </a>
+                        {% else %}
+                        Нет фото
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </div>
+</body>
+</html>

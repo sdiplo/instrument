@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактировать инструмент</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            margin: 10px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 600px;
+        }
+        h1 {
+            text-align: center;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+        }
+        input[type="text"],
+        textarea,
+        select {
+            width: calc(100% - 110px);
+            padding: 10px;
+            margin-top: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            display: inline-block;
+        }
+        input[type="file"] {
+            margin-top: 5px;
+        }
+        img {
+            display: block;
+            margin: 10px 0;
+            max-width: 100%;
+        }
+        input[type="submit"] {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            margin-top: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        input[type="submit"]:hover {
+            background-color: #45a049;
+        }
+        .delete-button {
+            background-color: #f44336;
+        }
+        .delete-button:hover {
+            background-color: #e53935;
+        }
+        a {
+            display: block;
+            text-align: center;
+            margin-top: 15px;
+            color: #4CAF50;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .edit-storage-button {
+            background-color: #008CBA;
+            color: white;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            display: inline-block;
+            margin-left: 10px;
+            margin-top: 5px;
+        }
+        .edit-storage-button:hover {
+            background-color: #007B9A;
+        }
+        .storage-location-wrapper {
+            display: flex;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Редактировать инструмент</h1>
+        <form action="{{ url_for('main.edit', instrument_id=instrument.id) }}" method="post" enctype="multipart/form-data">
+            <label for="name">Название:</label>
+            <input type="text" id="name" name="name" value="{{ instrument.name }}" required>
+            <label for="description">Описание:</label>
+            <textarea id="description" name="description">{{ instrument.description }}</textarea>
+            <label for="storage_location">Место хранения:</label>
+            <div class="storage-location-wrapper">
+                <select id="storage_location" name="storage_location" required>
+                    <option value="">--Выберите место хранения--</option>
+                    {% for location in storage_locations %}
+                    <option value="{{ location.id }}" {% if location.id == instrument.storage_location_id %}selected{% endif %}>
+                        {{ location.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+                <a href="{{ url_for('main.edit_storage_locations') }}" class="edit-storage-button">Редактировать</a>
+            </div>
+            <label for="photo">Фото:</label>
+            <input type="file" id="photo" name="photo">
+            {% if instrument.photo %}
+            <img src="data:image/jpeg;base64,{{ instrument.photo }}" alt="{{ instrument.name }}">
+            {% endif %}
+            <input type="submit" value="Сохранить">
+        </form>
+        <form action="{{ url_for('main.delete', instrument_id=instrument.id) }}" method="post" onsubmit="return confirm('Вы уверены, что хотите удалить этот инструмент?');">
+            <input type="submit" value="Удалить" class="delete-button">
+        </form>
+        <a href="{{ url_for('main.index') }}">Вернуться к списку инструментов</a>
+    </div>
+</body>
+</html>

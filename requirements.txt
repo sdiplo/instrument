@@ -1,0 +1,6 @@
+Flask==3.0.3
+Flask-Login==0.6.3
+Flask-Mail==0.10.0
+Pillow==10.4.0
+psycopg2==2.9.9
+#pip install pyyaml ua-parser user-agents
