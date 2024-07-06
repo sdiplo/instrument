@@ -29,13 +29,14 @@ def save_user_cookies(user_id):
         current_app.conn.commit()
 
 class User(UserMixin):
-    def __init__(self, id, username, email, password_hash, confirmed, confirmation_token):
+    def __init__(self, id, username, email, password_hash, confirmed, confirmation_token, roles):
         self.id = id
         self.username = username
         self.email = email
         self.password_hash = password_hash
         self.confirmed = confirmed
         self.confirmation_token = confirmation_token
+        self.roles = roles
 
     @staticmethod
     def get(user_id, cur):

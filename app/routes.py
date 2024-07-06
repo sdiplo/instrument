@@ -1,4 +1,4 @@
-from flask import Blueprint, request, redirect, url_for, render_template, flash, current_app, g
+from flask import Blueprint, request, redirect, url_for, render_template, flash, current_app, g, render_template_string
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
 import secrets
@@ -8,6 +8,7 @@ import io
 from .models import User, save_user_cookies
 from .email import send_email
 import psycopg2
+import uuid
 
 
 
@@ -20,19 +21,31 @@ def before_request():
 
 @main.route('/register', methods=['GET', 'POST'])
 def register():
-    if request.method == 'POST':
-        username = request.form['username']
-        email = request.form['email']
-        password = request.form['password']
-        with current_app.conn.cursor() as cur:
-            user = User.create(username, email, password, cur, current_app.conn)
-            token = user.confirmation_token
-            confirm_url = url_for('main.confirm_email', token=token, _external=True)
-            html = render_template('confirm_email.html', confirm_url=confirm_url)
-            send_email('Подтверждение регистрации', user.email, html)
-            flash('Письмо с подтверждением отправлено на вашу почту.', 'success')
-            return redirect(url_for('main.login'))
-    return render_template('register.html')
+    try:
+        if request.method == 'POST':
+            username = request.form['username']
+            email = request.form['email']
+            password = request.form['password']
+            password_hash = generate_password_hash(password)
+            token = str(uuid.uuid1())
+            with current_app.conn.cursor() as cur:
+                cur.execute("CALL register_user_procedure (%s,%s,%s,%s);",
+                            (username, password_hash, email, token))
+                current_app.conn.commit()
+               # user = User.create(username, email, password, cur, current_app.conn)
+                #token = token
+                confirm_url = url_for('main.confirm_email', token=token, _external=True)
+                html = render_template('confirm_email.html', confirm_url=confirm_url)
+                send_email('Подтверждение регистрации', email, html)
+                flash('Письмо с подтверждением отправлено на вашу почту.', 'success')
+                return redirect(url_for('main.login'))
+        return render_template('register.html')
+    except Exception as e:
+        # Если произошла ошибка, откатить транзакцию
+        print(f"An error occurred: {e}")
+        if current_app.conn:
+            current_app.conn.rollback()
+            return render_template_string('Что-то пошло не так')
 
 @main.route('/login', methods=['GET', 'POST'])
 def login():
@@ -59,21 +72,28 @@ def logout():
 
 @main.route('/confirm/<token>')
 def confirm_email(token):
-    with current_app.conn.cursor() as cur:
-        cur.execute("SELECT * FROM users WHERE confirmation_token = %s", (token,))
-        user_data = cur.fetchone()
-        if user_data:
-            user = User(*user_data)
-            user.confirmed = True
-            user.confirmation_token = None
-            cur.execute("UPDATE users SET confirmed = %s, confirmation_token = %s WHERE id = %s",
-                        (user.confirmed, user.confirmation_token, user.id))
-            current_app.conn.commit()
-            flash('Вы успешно подтвердили свой email!', 'success')
-            return redirect(url_for('main.login'))
-        else:
-            flash('Недействительная или истекшая ссылка подтверждения.', 'danger')
-    return redirect(url_for('main.index'))
+    try:
+        with current_app.conn.cursor() as cur:
+            cur.execute("SELECT * FROM users WHERE confirmation_token = %s", (token,))
+            user_data = cur.fetchone()
+            if user_data:
+                user = User(*user_data)
+                user.confirmed = True
+                user.confirmation_token = None
+                cur.execute("UPDATE users SET confirmed = %s, confirmation_token = %s WHERE id = %s",
+                            (user.confirmed, user.confirmation_token, user.id))
+                current_app.conn.commit()
+                flash('Вы успешно подтвердили свой email!', 'success')
+                return redirect(url_for('main.login'))
+            else:
+                flash('Недействительная или истекшая ссылка подтверждения.', 'danger')
+        return redirect(url_for('main.index'))
+
+    except Exception as e:
+        # Если произошла ошибка, откатить транзакцию
+        print(f"An error occurred: {e}")
+        if current_app.conn:
+            current_app.conn.rollback()
 
 
 @main.route('/reset_password_request', methods=['GET', 'POST'])
@@ -140,6 +160,69 @@ def index():
             } for row in instruments
         ]
     return render_template('index.html', instruments=instruments)
+
+
+
+@main.route('/admin', methods=['GET', 'POST'])
+@login_required
+def get_admin():
+    if User.roles == 1:
+        query_result = ''
+        columns = []
+        rows = []
+        error_message = ''
+        reports = []
+
+        try:
+            cur = current_app.conn.cursor()
+            cur.execute("SELECT id_report, ReportName FROM Reports")
+            reports = cur.fetchall()
+            cur.close()
+        except Exception as e:
+            error_message = f'Error fetching reports: {str(e)}'
+            if current_app.conn:
+                current_app.conn.rollback()
+        # finally:
+        #     close_db()
+
+        if request.method == 'POST':
+            query = ''
+            selected_report = request.form.get('report')
+            if selected_report:
+                try:
+                    cur = current_app.conn.cursor()
+                    cur.execute("SELECT SQLtext FROM Reports WHERE id_report = %s", (selected_report,))
+                    query = cur.fetchone()[0]
+                    cur.close()
+                except Exception as e:
+                    error_message = f'Error fetching report query: {str(e)}'
+                    if current_app.conn:
+                        current_app.conn.rollback()
+                # finally:
+                #     close_db()
+            else:
+                query = request.form.get('query', '')
+
+            if query:
+                try:
+                    cur = current_app.conn.cursor()
+                    cur.execute(query)
+
+                    if cur.description:
+                        columns = [desc[0] for desc in cur.description]
+                        rows = cur.fetchall()
+
+                    cur.close()
+                except Exception as e:
+                    error_message = f'Error executing query: {str(e)}'
+                    if current_app.conn:
+                        current_app.conn.rollback()
+                # finally:
+                #     close_db()
+
+        return render_template('admin.html', columns=columns, rows=rows, error_message=error_message, reports=reports)
+    else:
+        return redirect(url_for('main.index'))
 
 @main.route('/upload', methods=['GET', 'POST'])
 def upload():
