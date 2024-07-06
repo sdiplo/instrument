@@ -166,7 +166,7 @@ def index():
 @main.route('/admin', methods=['GET', 'POST'])
 @login_required
 def get_admin():
-    if User.roles == 1:
+    if current_user.roles == 1:
         query_result = ''
         columns = []
         rows = []
